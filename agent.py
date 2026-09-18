@@ -14,8 +14,17 @@ load_dotenv()
 
 BASE = Path(__file__).parent
 TOOLS_DIR = BASE / "tools"
-MODEL = os.getenv("AGENT_MODEL", "claude-opus-5")
+DEFAULT_MODEL = "claude-opus-5"
 MAX_ITERATIONS = 25
+
+
+def _resolve_model() -> str:
+    # Treat blank / whitespace env values as unset (common Vercel misconfig).
+    return (os.getenv("AGENT_MODEL") or "").strip() or DEFAULT_MODEL
+
+
+def _resolve_api_key() -> str:
+    return (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 
 
 class AgentLoop:
@@ -27,7 +36,14 @@ class AgentLoop:
         self.registry.load_tools(TOOLS_DIR)
 
         self.system_prompt = build_system_prompt()
-        self.client = AsyncAnthropic()
+        api_key = _resolve_api_key()
+        if not api_key:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY is not set. "
+                "Add it in Vercel → Project → Settings → Environment Variables, then redeploy."
+            )
+        self.client = AsyncAnthropic(api_key=api_key)
+        self.model = _resolve_model()
         self._history: list[dict] = []
 
     async def run(self, incident: dict) -> AsyncGenerator[dict, None]:
@@ -47,10 +63,10 @@ class AgentLoop:
         yield {"type": "topology_update", "state": self.simulator.get_topology_state()}
 
         for iteration in range(1, MAX_ITERATIONS + 1):
-            yield {"type": "log", "iteration": iteration, "model": MODEL}
+            yield {"type": "log", "iteration": iteration, "model": self.model}
 
             llm_input = {
-                "model": MODEL,
+                "model": self.model,
                 "max_tokens": 4096,
                 "system": self.system_prompt,
                 "tools": tools,
@@ -63,7 +79,18 @@ class AgentLoop:
             print(json.dumps(llm_input, indent=2, default=str))
             print(f"{'═'*60}")
 
-            response = await self.client.messages.create(**llm_input)
+            try:
+                response = await self.client.messages.create(**llm_input)
+            except Exception as exc:
+                yield {
+                    "type": "error",
+                    "message": (
+                        f"Anthropic API error: {exc}. "
+                        f"Check ANTHROPIC_API_KEY and AGENT_MODEL "
+                        f"(currently using model '{self.model}')."
+                    ),
+                }
+                return
 
             print(f"\n{'─'*60}")
             print(f"[iter {iteration}] RAW LLM RESPONSE")
@@ -170,7 +197,7 @@ class AgentLoop:
             for i, s in enumerate(self._history)
         )
         response = await self.client.messages.create(
-            model=MODEL,
+            model=self.model,
             max_tokens=400,
             system=(
                 "You are a senior network engineer reflecting on a completed troubleshooting session. "

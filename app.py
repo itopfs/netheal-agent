@@ -57,18 +57,33 @@ async def run_scenario(scenario_id: str):
     incident = json.loads((scenario_path / "incident.json").read_text())
 
     async def event_stream():
+        # Flush headers immediately so EventSource doesn't time out waiting.
+        yield ": connected\n\n"
         from agent import AgentLoop
 
-        loop = AgentLoop(scenario_path)
-        async for event in loop.run(incident):
-            yield f"data: {json.dumps(event)}\n\n"
-            await asyncio.sleep(0.05)
+        try:
+            loop = AgentLoop(scenario_path)
+        except RuntimeError as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            yield 'data: {"type":"stream_end"}\n\n'
+            return
+
+        try:
+            async for event in loop.run(incident):
+                yield f"data: {json.dumps(event)}\n\n"
+                await asyncio.sleep(0.05)
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Server error: {exc}'})}\n\n"
         yield 'data: {"type":"stream_end"}\n\n'
 
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

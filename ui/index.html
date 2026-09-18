@@ -648,8 +648,24 @@ function startAgent() {
   clearDecisionPanel();
 
   evtSource = new EventSource(`/api/run/${selectedScenario}`);
-  evtSource.onmessage = e => handleEvent(JSON.parse(e.data));
-  evtSource.onerror   = () => { stopAgent(); setStatus('error', 'Connection error'); };
+  evtSource.onmessage = e => {
+    try {
+      handleEvent(JSON.parse(e.data));
+    } catch (err) {
+      stopAgent();
+      setStatus('error', 'Error');
+      showError(`Failed to parse agent event: ${err}`);
+    }
+  };
+  evtSource.onerror = () => {
+    // EventSource fires error on normal close too — only show if still "running"
+    if (!running) return;
+    stopAgent();
+    setStatus('error', 'Connection error');
+    showError(
+      'Lost connection to the agent stream. Often caused by a missing/blank AGENT_MODEL or ANTHROPIC_API_KEY on Vercel, or a function timeout. Check Vercel logs and env vars, then redeploy.'
+    );
+  };
 }
 
 function stopAgent() {
