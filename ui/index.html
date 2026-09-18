@@ -384,9 +384,119 @@
   }
   .pulse { animation: pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  /* Welcome modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(1, 4, 9, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: #1c2330;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    max-width: 720px;
+    width: 100%;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    position: relative;
+  }
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: var(--red);
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close:hover {
+    background: #da3633;
+    color: #fff;
+  }
+  .modal-body { padding: 28px 28px 24px; }
+  .modal-body h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-bottom: 12px;
+    padding-right: 36px;
+  }
+  .modal-body p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .modal-body p:last-child { margin-bottom: 0; }
+  .modal-body .muted { color: var(--text-muted); }
+  .modal-steps {
+    margin: 14px 0 0;
+    padding-left: 18px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .modal-steps li { margin-bottom: 6px; }
+  .modal-steps strong { color: var(--text); font-weight: 600; }
+  .modal-section-title {
+    margin-top: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .modal-howto .modal-steps {
+    color: var(--text);
+  }
 </style>
 </head>
 <body>
+
+<!-- Welcome popup -->
+<div class="modal-overlay" id="welcome-modal" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+  <div class="modal">
+    <button type="button" class="modal-close" id="welcome-close" aria-label="Close">×</button>
+    <div class="modal-body">
+      <h2 id="welcome-title">Welcome to NetHeal Agent</h2>
+      <p>
+        NetHeal Agent is a <strong>network simulator</strong> that demonstrates an
+        <strong>AI agentic loop</strong> for self-healing networks. An autonomous LLM acts as
+        an operator: it investigates incidents, selects diagnostic and repair tools, and works
+        toward restoring connectivity — without a fixed, scripted playbook.
+      </p>
+      <ul class="modal-steps">
+        <li><strong>Seven predefined scenarios</strong> — each with a different network fault; the number and sequence of tools vary, with no single predetermined path to success.</li>
+        <li><strong>No topology or root-cause map</strong> — the LLM receives only the incident report and a catalog of available tools.</li>
+        <li><strong>Observe → decide → act</strong> — each turn it reasons from the latest observations, chooses the next tool and parameters, executes it, and adds the result to its context.</li>
+        <li><strong>Stop when done</strong> — the loop continues until the agent verifies a fix or escalates a fault that cannot be repaired remotely.</li>
+        <li><strong>Non-deterministic</strong> — the same scenario can produce a different tool order and step count on each run, because selection is driven by model reasoning, not hardcoded rules.</li>
+      </ul>
+      <p class="modal-section-title">How to begin:</p>
+      <ol class="modal-steps modal-howto">
+        <li>Select a scenario from the left panel.</li>
+        <li>Click <strong>Troubleshoot &amp; Heal</strong> to start the agent.</li>
+        <li>Follow the topology, decisions, and timeline as the observe → decide → act loop unfolds.</li>
+      </ol>
+      <p class="modal-section-title" style="margin-top:18px">In a real network:</p>
+      <p>
+        The same loop would be driven by live inputs such as service-desk tickets,
+        monitoring alarms, or NOC dashboards instead of predefined scenarios. The agent would call real
+        diagnostic and change APIs (or controlled automation runbooks) on production devices, apply a
+        verified fix or escalate to an engineer when remote repair is not possible, and leave an auditable
+        trail of every decision and action.
+      </p>
+    </div>
+  </div>
+</div>
 
 <header>
   <div class="logo">⚡ NetHeal Agent</div>
@@ -465,9 +575,23 @@ let agentModel = 'gpt-4o';
 //  Boot
 // ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  setupWelcomeModal();
   await loadScenarios();
   drawTopology(defaultTopology());
 });
+
+function setupWelcomeModal() {
+  const overlay = document.getElementById('welcome-modal');
+  const closeBtn = document.getElementById('welcome-close');
+  const close = () => overlay.classList.add('hidden');
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close();
+  });
+}
 
 async function loadScenarios() {
   const res  = await fetch('/api/scenarios');
