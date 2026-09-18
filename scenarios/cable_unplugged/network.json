@@ -4,7 +4,10 @@
       "type": "cable_unplugged",
       "device": "switch1",
       "interface": "Fa0/1",
-      "link": ["pc1", "switch1"],
+      "link": [
+        "pc1",
+        "switch1"
+      ],
       "breaks_connectivity": true
     }
   ],
@@ -22,7 +25,7 @@
         {
           "time": "2026-08-10 10:22:03",
           "level": "WARNING",
-          "msg": "DHCP lease expired \u2014 unable to renew, no link"
+          "msg": "DHCP lease expired — unable to renew, no link"
         },
         {
           "time": "2026-08-10 09:58:00",
@@ -37,17 +40,12 @@
         "Fa0/1": {
           "status": "down",
           "vlan": 10,
-          "description": "PC1 uplink \u2014 physical link down"
-        },
-        "Fa0/2": {
-          "status": "up",
-          "vlan": 10,
-          "description": "Workstation-2 uplink"
+          "description": "PC1 uplink — physical link down"
         },
         "Fa0/3": {
           "status": "up",
           "vlan": 10,
-          "description": "Workstation-3 uplink"
+          "description": "DNS Server uplink"
         },
         "Gi0/1": {
           "status": "up",
@@ -61,7 +59,6 @@
           "name": "LAN-A",
           "ports": [
             "Fa0/1",
-            "Fa0/2",
             "Fa0/3",
             "Gi0/1"
           ]
@@ -76,12 +73,12 @@
         {
           "time": "2026-08-10 10:22:04",
           "level": "ERROR",
-          "msg": "%LINK-3-UPDOWN: Interface FastEthernet0/1, changed state to down \u2014 physical link loss detected"
+          "msg": "%LINK-3-UPDOWN: Interface FastEthernet0/1, changed state to down — physical link loss detected"
         },
         {
           "time": "2026-08-10 10:22:03",
           "level": "WARNING",
-          "msg": "Port Fa0/1: no carrier signal \u2014 cable disconnection suspected"
+          "msg": "Port Fa0/1: no carrier signal — cable disconnection suspected"
         },
         {
           "time": "2026-08-10 09:58:00",
@@ -91,7 +88,7 @@
         {
           "time": "2026-08-10 08:00:00",
           "level": "INFO",
-          "msg": "System health check OK \u2014 all ports nominal"
+          "msg": "System health check OK — all ports nominal"
         }
       ],
       "mac_table": [
@@ -101,8 +98,21 @@
           "interface": "Gi0/1",
           "type": "DYNAMIC",
           "host": "router1"
+        },
+        {
+          "vlan": 10,
+          "mac": "00:50:56:aa:53:01",
+          "interface": "Fa0/3",
+          "type": "DYNAMIC",
+          "host": "dns_server"
         }
       ]
+    },
+    "dns_server": {
+      "type": "server",
+      "ip": "10.0.1.53",
+      "gateway": "10.0.1.1",
+      "logs": []
     },
     "router1": {
       "type": "router",
@@ -230,6 +240,10 @@
     "links": [
       {
         "from": "pc1",
+        "to": "switch1"
+      },
+      {
+        "from": "dns_server",
         "to": "switch1"
       },
       {

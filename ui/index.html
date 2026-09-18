@@ -521,7 +521,7 @@
     <div class="panel">
       <div class="panel-header">Network Topology of Network Simulator</div>
       <div id="topology-container">
-        <svg id="topology-svg" viewBox="0 0 420 285" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:420px"></svg>
+        <svg id="topology-svg" viewBox="-8 0 436 290" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:420px"></svg>
       </div>
     </div>
 
@@ -884,13 +884,15 @@ const NODE_DEFS = {
   server1:     { x: 275, y: 228, label: 'Server1',     icon: '🖥' },
 };
 const LINK_DEFS = [
-  { from: 'firewall',    to: 'router1'     },
-  { from: 'router1',     to: 'switch1'     },
-  { from: 'router1',     to: 'switch2'     },
-  { from: 'switch1',     to: 'pc1'         },
-  { from: 'switch1',     to: 'dns_server'  },
-  { from: 'switch2',     to: 'server1'     },
-  { from: 'router1',     to: 'mgmt_server', outOfBand: true },
+  { from: 'firewall',    to: 'router1',     fromIf: '',      toIf: 'Gi0/2' },
+  { from: 'router1',     to: 'switch1',     fromIf: 'Gi0/0', toIf: 'Gi0/1' },
+  { from: 'router1',     to: 'switch2',     fromIf: 'Gi0/1', toIf: 'Gi0/1' },
+  { from: 'switch1',     to: 'pc1',         fromIf: 'Fa0/1', toIf: 'eth0',
+    fromNudge: { x: -10, y: 2 }, toNudge: { x: 4, y: -2 } },
+  { from: 'switch1',     to: 'dns_server',  fromIf: 'Fa0/3', toIf: 'eth0',
+    fromNudge: { x: 12, y: 2 } },
+  { from: 'switch2',     to: 'server1',     fromIf: 'Fa0/1', toIf: 'eth0'  },
+  { from: 'router1',     to: 'mgmt_server', fromIf: 'mgmt',  toIf: '', outOfBand: true },
 ];
 const W = 100, H = 40;
 
@@ -901,6 +903,37 @@ function colorFor(status) {
 }
 function linkColorFor(status) {
   return status === 'fault' ? '#f85149' : '#3fb950';
+}
+
+function addIfaceLabel(svg, x, y, text, fill) {
+  if (!text) return;
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  el.setAttribute('x', x);
+  el.setAttribute('y', y);
+  el.setAttribute('text-anchor', 'middle');
+  el.setAttribute('dominant-baseline', 'middle');
+  el.setAttribute('fill', fill);
+  el.setAttribute('font-size', '9');
+  el.setAttribute('font-family', 'monospace');
+  el.setAttribute('font-weight', '600');
+  el.setAttribute('paint-order', 'stroke');
+  el.setAttribute('stroke', '#0d1117');
+  el.setAttribute('stroke-width', '3');
+  el.textContent = text;
+  svg.appendChild(el);
+}
+
+/** Place a label just outside a node box, along the link toward the other end. */
+function ifacePointOutside(cx, cy, ox, oy, halfW, halfH, nudge) {
+  const dx = ox - cx, dy = oy - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  // Stay on this side of the link — never past the midpoint (avoids swapped labels on short links)
+  const want = Math.abs(ux) * halfW + Math.abs(uy) * halfH + 12;
+  const edge = Math.min(want, Math.max(16, len * 0.35));
+  const px = -uy * 9, py = ux * 9;
+  const nx = nudge?.x || 0, ny = nudge?.y || 0;
+  return { x: cx + ux * edge + px + nx, y: cy + uy * edge + py + ny };
 }
 
 let nodeStatus = {};
@@ -924,16 +957,20 @@ function drawTopology(state) {
   const svg = document.getElementById('topology-svg');
   svg.innerHTML = '';
 
-  // Links
+  const drawnLinks = [];
+
+  // Links (wires first)
   LINK_DEFS.forEach(l => {
     const a = NODE_DEFS[l.from], b = NODE_DEFS[l.to];
     if (!a || !b) return;
     const aw = a.w || W, bw = b.w || W;
+    const x1 = a.x + aw/2, y1 = a.y + H/2;
+    const x2 = b.x + bw/2, y2 = b.y + H/2;
     const key = `${l.from}-${l.to}`;
     const status = linkStatus[key] || linkStatus[`${l.to}-${l.from}`] || 'healthy';
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', a.x + aw/2); line.setAttribute('y1', a.y + H/2);
-    line.setAttribute('x2', b.x + bw/2); line.setAttribute('y2', b.y + H/2);
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
     if (l.outOfBand) {
       line.setAttribute('stroke', '#58a6ff');
       line.setAttribute('stroke-width', '1.5');
@@ -946,9 +983,10 @@ function drawTopology(state) {
     }
     line.setAttribute('class', 'link');
     svg.appendChild(line);
+    drawnLinks.push({ l, a, b, aw, bw, x1, y1, x2, y2, status });
   });
 
-  // Nodes
+  // Nodes (above wires)
   Object.entries(NODE_DEFS).forEach(([id, def]) => {
     const status = nodeStatus[id] || 'healthy';
     const { fill, stroke } = def.mgmt
@@ -978,6 +1016,15 @@ function drawTopology(state) {
     g.appendChild(rect);
     g.appendChild(label);
     svg.appendChild(g);
+  });
+
+  // Interface labels last — outside boxes, on top of everything
+  drawnLinks.forEach(({ l, a, b, aw, bw, x1, y1, x2, y2, status }) => {
+    const labelFill = l.outOfBand ? '#58a6ff' : (status === 'fault' ? '#f85149' : '#c9d1d9');
+    const pFrom = ifacePointOutside(x1, y1, x2, y2, aw / 2, H / 2, l.fromNudge);
+    const pTo   = ifacePointOutside(x2, y2, x1, y1, bw / 2, H / 2, l.toNudge);
+    addIfaceLabel(svg, pFrom.x, pFrom.y, l.fromIf, labelFill);
+    addIfaceLabel(svg, pTo.x, pTo.y, l.toIf, labelFill);
   });
 }
 
