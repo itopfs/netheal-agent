@@ -1,0 +1,249 @@
+{
+  "faults": [
+    {
+      "type": "acl_block",
+      "device": "firewall",
+      "rule_id": "10",
+      "breaks_connectivity": true
+    }
+  ],
+  "devices": {
+    "pc1": {
+      "type": "pc",
+      "ip": "10.0.1.100",
+      "gateway": "10.0.1.1",
+      "logs": []
+    },
+    "switch1": {
+      "type": "switch",
+      "interfaces": {
+        "Fa0/1": {
+          "status": "up",
+          "vlan": 10,
+          "description": "PC1"
+        },
+        "Gi0/1": {
+          "status": "up",
+          "vlan": 10,
+          "description": "Router1"
+        }
+      },
+      "vlans": [
+        {
+          "id": 10,
+          "name": "LAN-A",
+          "ports": [
+            "Fa0/1",
+            "Gi0/1"
+          ]
+        }
+      ],
+      "logs": [],
+      "mac_table": [
+        {
+          "vlan": 10,
+          "mac": "00:50:56:aa:01:01",
+          "interface": "Fa0/1",
+          "type": "DYNAMIC",
+          "host": "pc1"
+        },
+        {
+          "vlan": 10,
+          "mac": "00:50:56:aa:03:01",
+          "interface": "Gi0/1",
+          "type": "DYNAMIC",
+          "host": "router1"
+        }
+      ]
+    },
+    "router1": {
+      "type": "router",
+      "interfaces": {
+        "Gi0/0": {
+          "status": "up",
+          "ip": "10.0.1.1/24",
+          "description": "LAN-A"
+        },
+        "Gi0/1": {
+          "status": "up",
+          "ip": "10.0.2.1/24",
+          "description": "LAN-B"
+        },
+        "Gi0/2": {
+          "status": "up",
+          "ip": "10.1.0.1/24",
+          "description": "To Firewall"
+        }
+      },
+      "routing_table": [
+        {
+          "network": "10.0.1.0/24",
+          "via": "direct",
+          "interface": "Gi0/0",
+          "metric": 0
+        },
+        {
+          "network": "10.0.2.0/24",
+          "via": "direct",
+          "interface": "Gi0/1",
+          "metric": 0
+        },
+        {
+          "network": "0.0.0.0/0",
+          "via": "10.1.0.254",
+          "interface": "Gi0/2",
+          "metric": 1
+        }
+      ],
+      "logs": [],
+      "arp_table": [
+        {
+          "ip": "10.0.1.100",
+          "mac": "00:50:56:aa:01:01",
+          "interface": "Gi0/0",
+          "host": "pc1",
+          "state": "active"
+        },
+        {
+          "ip": "10.0.2.100",
+          "mac": "00:50:56:aa:02:01",
+          "interface": "Gi0/1",
+          "host": "server1",
+          "state": "active"
+        }
+      ],
+      "dhcp_leases": [
+        {
+          "ip": "10.0.1.100",
+          "mac": "00:50:56:aa:01:01",
+          "host": "pc1",
+          "expires": "2026-08-11 06:00:00",
+          "state": "Active"
+        }
+      ]
+    },
+    "firewall": {
+      "type": "firewall",
+      "interfaces": {
+        "eth0": {
+          "status": "up",
+          "ip": "10.1.0.254/24",
+          "description": "Inside (LAN)"
+        },
+        "eth1": {
+          "status": "up",
+          "ip": "192.168.1.1/24",
+          "description": "Outside (DMZ/Servers)"
+        }
+      },
+      "acls": [
+        {
+          "id": "10",
+          "action": "DENY",
+          "protocol": "any",
+          "source": "10.0.1.0/24",
+          "destination": "10.0.2.0/24",
+          "port": "-"
+        },
+        {
+          "id": "100",
+          "action": "PERMIT",
+          "protocol": "any",
+          "source": "any",
+          "destination": "any",
+          "port": "-"
+        }
+      ],
+      "logs": [
+        {
+          "time": "2026-08-04 18:05:22",
+          "level": "INFO",
+          "msg": "New hardening policy applied: rule 10 added (DENY office-to-servers)"
+        },
+        {
+          "time": "2026-08-04 18:00:00",
+          "level": "INFO",
+          "msg": "Quarterly security hardening started"
+        },
+        {
+          "time": "2026-08-04 08:00:00",
+          "level": "INFO",
+          "msg": "System OK"
+        }
+      ]
+    },
+    "switch2": {
+      "type": "switch",
+      "interfaces": {
+        "Fa0/1": {
+          "status": "up",
+          "vlan": 20,
+          "description": "Server1"
+        },
+        "Gi0/1": {
+          "status": "up",
+          "vlan": 20,
+          "description": "Router1"
+        }
+      },
+      "vlans": [
+        {
+          "id": 20,
+          "name": "LAN-B",
+          "ports": [
+            "Fa0/1",
+            "Gi0/1"
+          ]
+        }
+      ],
+      "logs": []
+    },
+    "server1": {
+      "type": "server",
+      "ip": "10.0.2.100",
+      "gateway": "10.0.2.1",
+      "logs": []
+    }
+  },
+  "connectivity": {
+    "pc1_to_server1": false
+  },
+  "topology": {
+    "links": [
+      {
+        "from": "pc1",
+        "to": "switch1"
+      },
+      {
+        "from": "switch1",
+        "to": "router1"
+      },
+      {
+        "from": "router1",
+        "to": "firewall"
+      },
+      {
+        "from": "firewall",
+        "to": "switch2"
+      },
+      {
+        "from": "switch2",
+        "to": "server1"
+      }
+    ],
+    "pc1_to_server1_hops": [
+      {
+        "ip": "10.0.1.1",
+        "label": "router1",
+        "ms": 1,
+        "reachable": true
+      },
+      {
+        "ip": "10.1.0.254",
+        "label": "firewall - DENY rule 10",
+        "ms": null,
+        "reachable": false
+      }
+    ]
+  }
+}

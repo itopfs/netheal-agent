@@ -1,0 +1,5 @@
+{
+  "name": "Interface Down",
+  "description": "A router interface is administratively shut down, cutting off a server segment.",
+  "difficulty": "Easy"
+}

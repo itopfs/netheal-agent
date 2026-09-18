@@ -1,0 +1,12 @@
+{
+  "problem": "PC1 has completely lost network connectivity",
+  "source": "pc1",
+  "destination": "server1",
+  "reported_by": "helpdesk@corp.local",
+  "severity": "medium",
+  "affected_users": 1,
+  "notes": "User at PC1 reported total loss of network access \u2014 cannot reach shared drives, internet, or any internal services. PC1 cannot ping even the local default gateway (10.0.1.1). No software changes were made. Other workstations connected to the same switch are fully operational. Issue appeared suddenly mid-morning after the user moved their desk.",
+  "affected_device_ip": "10.0.1.100",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/1"
+}

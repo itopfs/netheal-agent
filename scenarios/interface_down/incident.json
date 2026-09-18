@@ -1,0 +1,12 @@
+{
+  "problem": "Server unreachable from user workstation",
+  "source": "pc1",
+  "destination": "server1",
+  "reported_by": "helpdesk@corp.local",
+  "severity": "high",
+  "affected_users": 24,
+  "notes": "Started after weekend maintenance window. PC1 cannot reach server1 by hostname or IP. Other workstations in the same VLAN can reach server1. PC1 can reach the default gateway but cannot reach server1. DNS resolution for server1 succeeds. TCP connection to server1:443 times out. No recent changes were made on PC1. Server1 is responding normally to other clients.",
+  "affected_device_ip": "10.0.1.100",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/1"
+}

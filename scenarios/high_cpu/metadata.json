@@ -1,0 +1,5 @@
+{
+  "name": "High CPU / Routing Loop",
+  "description": "A routing loop is causing 98% CPU on the router, dropping all packets.",
+  "difficulty": "Hard"
+}

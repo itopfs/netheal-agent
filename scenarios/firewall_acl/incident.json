@@ -1,0 +1,12 @@
+{
+  "problem": "All HTTP/S requests to production server are being refused. Affects all office users.",
+  "source": "pc1",
+  "destination": "server1",
+  "reported_by": "security@corp.local",
+  "severity": "critical",
+  "affected_users": 300,
+  "notes": "Firewall policy was updated by security team yesterday as part of quarterly hardening",
+  "affected_device_ip": "10.0.1.100",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/1"
+}

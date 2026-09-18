@@ -1,0 +1,12 @@
+{
+  "problem": "Application team reports intermittent connection resets to production server",
+  "source": "pc1",
+  "destination": "server1",
+  "reported_by": "app-team@corp.local",
+  "severity": "high",
+  "affected_users": 120,
+  "notes": "",
+  "affected_device_ip": "10.0.1.100",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/1"
+}

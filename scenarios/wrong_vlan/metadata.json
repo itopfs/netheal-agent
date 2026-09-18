@@ -1,0 +1,5 @@
+{
+  "name": "Wrong VLAN",
+  "description": "A workstation port was assigned to the wrong VLAN after a switch config push.",
+  "difficulty": "Easy"
+}

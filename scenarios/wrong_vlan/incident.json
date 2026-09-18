@@ -1,0 +1,12 @@
+{
+  "problem": "PC1 cannot reach any network resources including the default gateway",
+  "source": "pc1",
+  "destination": "server1",
+  "reported_by": "noc@corp.local",
+  "severity": "medium",
+  "affected_users": 1,
+  "notes": "Issue appeared after switch1 config was pushed from automation system yesterday at 17:00",
+  "affected_device_ip": "10.0.1.100",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/1"
+}

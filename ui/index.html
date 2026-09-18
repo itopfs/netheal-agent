@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetHeal Agent</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --orange: #ffa657;
+    --font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 280px 1fr;
+    overflow: hidden;
+  }
+  /* Header */
+  header {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 12px;
+  }
+  header .logo { font-size: 18px; font-weight: 700; color: var(--blue); }
+  header .status-badge {
+    margin-left: auto;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  header .status-badge.running { background: #1a2f1a; border-color: var(--green); color: var(--green); }
+  header .status-badge.done    { background: #1a2f1a; border-color: var(--green); color: var(--green); }
+  header .status-badge.error   { background: #2f1a1a; border-color: var(--red);   color: var(--red); }
+  /* Left: scenarios (full height) */
+  .scenarios-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* Right: topology + decision on top, timeline below */
+  .workspace {
+    display: grid;
+    grid-template-rows: minmax(220px, 1fr) minmax(300px, 50vh);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* Panels */
+  .panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .panel:last-child { border-right: none; }
+  .panel-header {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+  /* Left panel */
+  .scenario-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    margin-bottom: 6px;
+    transition: border-color 0.15s;
+  }
+  .scenario-card:hover  { border-color: var(--blue); }
+  .scenario-card.active { border-color: var(--blue); background: #1a2535; }
+  .scenario-card .s-name { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .scenario-card .s-desc { font-size: 11px; color: var(--text-muted); line-height: 1.35; }
+  .difficulty { display: inline-block; margin-top: 4px; font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+  .difficulty.Easy   { background: #1a2f1a; color: var(--green); }
+  .difficulty.Medium { background: #2a2310; color: var(--yellow); }
+  .difficulty.Hard   { background: #2f1a1a; color: var(--red); }
+  .incident-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    margin-top: 10px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--blue); color: #000; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  .btn-stop { background: var(--red); color: #fff; display: none; }
+  .btn-stop:hover:not(:disabled) { opacity: 0.85; }
+  /* Center: topology SVG */
+  #topology-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: 20px;
+  }
+  #topology-svg { width: 100%; height: auto; max-width: 300px; }
+  .node rect { rx: 8; ry: 8; stroke-width: 2; transition: fill 0.4s, stroke 0.4s; }
+  .node text  { font-size: 11px; font-family: var(--font); font-weight: 600; }
+  .link { stroke-width: 2; transition: stroke 0.4s; }
+  /* Right panel — decision */
+  .decision-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .decision-box .label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .decision-box .value {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .tool-chip {
+    display: inline-block;
+    background: #1a2535;
+    border: 1px solid var(--blue);
+    color: var(--blue);
+    font-family: var(--font);
+    font-size: 13px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+  .param-list { font-family: var(--font); font-size: 12px; color: var(--orange); line-height: 1.6; }
+  /* Timeline under topology/decision */
+  .timeline {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    padding: 10px 16px 16px;
+    min-height: 0;
+  }
+  /* Iteration cards */
+  .tl-card {
+    border: 1px solid var(--text);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .tl-card-header {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tl-card-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .iter-num   { color: var(--text); }
+  .iter-model { color: var(--text-muted); font-weight: 400; }
+  .tl-card-row {
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+    line-height: 1.45;
+  }
+  .tl-card-row:last-child { border-bottom: none; }
+  .tl-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--yellow);
+    padding-top: 2px;
+  }
+  .tl-card-llm    { font-size: 12px; line-height: 1.6; color: var(--text); width: 100%; display: flex; flex-direction: column; gap: 3px; }
+  .llm-line       { display: flex; gap: 8px; align-items: flex-start; }
+  .llm-key        { font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--purple); min-width: 68px; padding-top: 3px; flex-shrink: 0; }
+  .llm-val        { font-family: var(--font); font-size: 11px; color: var(--text-muted); white-space: pre-wrap; word-break: break-all; }
+  .llm-val.has-content { color: var(--text); }
+  .llm-content-block {
+    font-family: var(--font);
+    font-size: 11px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    flex: 1;
+    overflow-x: auto;
+  }
+  .llm-content-block .jk { color: var(--blue); }
+  .llm-content-block .js { color: var(--green); }
+  .llm-content-block .jn { color: var(--orange); }
+  .llm-content-block .jb { color: var(--text-muted); }
+  .tl-card-tool   { font-family: var(--font); color: var(--blue); font-size: 12px; word-break: break-all; }
+  .tl-card-osi-inline { color: var(--orange); font-weight: 600; }
+  .tl-card-result { font-family: var(--font); font-size: 11px; color: var(--text-muted); white-space: pre-wrap; word-break: break-all; }
+  .tl-card-result.pass { color: var(--green); }
+  .tl-card-result.fail { color: var(--red); }
+  /* Resolution report card */
+  .tl-report {
+    border: 1px solid var(--green);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .tl-report-header {
+    background: #0d2a0d;
+    border-bottom: 1px solid var(--green);
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--green);
+  }
+  .tl-report-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--green);
+    opacity: .3;
+  }
+  .tl-report-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+    line-height: 1.45;
+  }
+  .tl-report-row:last-child { border-bottom: none; }
+  .tl-report-rlabel {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+    padding-top: 2px;
+  }
+  .rf-root-val  { color: var(--yellow); font-size: 12px; }
+  .rf-fix-val   { font-family: var(--font); color: var(--green); font-size: 12px; word-break: break-all; }
+  .rf-total-val { color: var(--text-muted); font-size: 12px; }
+  /* Methodology card */
+  .tl-methodology {
+    border: 1px solid var(--purple);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .tl-methodology-header {
+    background: #1a1030;
+    border-bottom: 1px solid var(--purple);
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--purple);
+  }
+  .tl-methodology-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--purple);
+    opacity: .3;
+  }
+  .tl-methodology-body {
+    padding: 10px 12px;
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 12px;
+  }
+  .done-banner {
+    text-align: center;
+    padding: 12px;
+    background: #0d2a0d;
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    color: var(--green);
+    font-weight: 600;
+    margin: 8px 0;
+    display: none;
+  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  .pulse { animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡ NetHeal Agent</div>
+  <div id="status-badge" class="status-badge">Idle</div>
+</header>
+
+<!-- LEFT: scenarios full height -->
+<div class="scenarios-panel">
+  <div class="panel-header">Common Scenarios</div>
+  <div class="panel-body">
+    <div id="scenario-list"></div>
+    <div id="incident-display" class="incident-box" style="display:none"></div>
+    <button id="run-btn"  class="btn btn-primary" disabled>Troubleshoot &amp; Heal</button>
+    <button id="stop-btn" class="btn btn-stop">Stop Agent</button>
+    <div id="done-banner" class="done-banner">✓ Issue resolved</div>
+  </div>
+</div>
+
+<!-- RIGHT: topology + decision, timeline below -->
+<div class="workspace">
+  <div class="main">
+    <div class="panel">
+      <div class="panel-header">Network Topology of Network Simulator</div>
+      <div id="topology-container">
+        <svg id="topology-svg" viewBox="0 0 420 285" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:420px"></svg>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Current Decision</div>
+      <div class="panel-body" id="decision-panel">
+        <div class="decision-box">
+          <div class="label">Status</div>
+          <div class="value" style="color:var(--text-muted)">Select a scenario and click Troubleshoot &amp; Heal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline" id="timeline">
+    <div style="padding:8px 0; color:var(--text-muted); font-size:12px; text-align:center">
+      Agent timeline will appear here once started
+    </div>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────────────────────────
+//  State
+// ──────────────────────────────────────────────────────────────────
+const OSI_LAYER = {
+  ping:                'OSI L3',
+  traceroute:          'OSI L3',
+  show_interfaces:     'OSI L1/L2',
+  show_routes:         'OSI L3',
+  show_vlan:           'OSI L2',
+  show_acl:            'OSI L3/L4',
+  show_logs:           'OSI L1–L7',
+  restart_interface:   'OSI L1/L2',
+  move_port_vlan:      'OSI L2',
+  add_route:           'OSI L3',
+  update_acl:          'OSI L3/L4',
+  verify_connectivity: 'OSI L3/L4',
+  show_arp:            'OSI L2/L3',
+  show_mac_table:      'OSI L2',
+  show_dhcp_leases:    'OSI L3',
+  finish:              '',
+};
+
+let selectedScenario = null;
+let evtSource = null;
+let running = false;
+let agentModel = 'gpt-4o';
+
+// ──────────────────────────────────────────────────────────────────
+//  Boot
+// ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadScenarios();
+  drawTopology(defaultTopology());
+});
+
+async function loadScenarios() {
+  const res  = await fetch('/api/scenarios');
+  const list = await res.json();
+  const container = document.getElementById('scenario-list');
+  container.innerHTML = '';
+  list.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'scenario-card';
+    card.dataset.id = s.id;
+    card.innerHTML = `
+      <div class="s-name">${s.name}</div>
+      <div class="s-desc">${s.description}</div>
+      <span class="difficulty ${s.difficulty}">${s.difficulty}</span>
+    `;
+    card.addEventListener('click', () => selectScenario(s.id, card));
+    container.appendChild(card);
+  });
+}
+
+async function selectScenario(id, card) {
+  if (running) return;
+  document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  selectedScenario = id;
+
+  const res  = await fetch(`/api/scenarios/${id}`);
+  const data = await res.json();
+  const box  = document.getElementById('incident-display');
+  box.style.display = 'block';
+  box.textContent = JSON.stringify(data.incident, null, 2);
+
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('done-banner').style.display = 'none';
+  clearDecisionPanel();
+  clearTimeline();
+  drawTopology(defaultTopology());
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  Run / Stop
+// ──────────────────────────────────────────────────────────────────
+document.getElementById('run-btn').addEventListener('click', startAgent);
+document.getElementById('stop-btn').addEventListener('click', stopAgent);
+
+function startAgent() {
+  if (!selectedScenario || running) return;
+  running = true;
+  setStatus('running', 'Running…');
+  document.getElementById('run-btn').disabled  = true;
+  document.getElementById('stop-btn').style.display = 'block';
+  document.getElementById('done-banner').style.display = 'none';
+  clearTimeline();
+  clearDecisionPanel();
+
+  evtSource = new EventSource(`/api/run/${selectedScenario}`);
+  evtSource.onmessage = e => handleEvent(JSON.parse(e.data));
+  evtSource.onerror   = () => { stopAgent(); setStatus('error', 'Connection error'); };
+}
+
+function stopAgent() {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  running = false;
+  document.getElementById('run-btn').disabled  = false;
+  document.getElementById('stop-btn').style.display = 'none';
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  Event handler
+// ──────────────────────────────────────────────────────────────────
+let currentIteration = {};
+
+function handleEvent(ev) {
+  switch (ev.type) {
+    case 'topology_update':
+      updateTopology(ev.state);
+      break;
+
+    case 'log':
+      agentModel = ev.model || agentModel;
+      break;
+
+    case 'decision':
+      currentIteration = { iter: ev.iteration, reason: ev.reason, tool: ev.tool, params: ev.params, rawContent: ev.raw_content };
+      showDecision(ev);
+      break;
+
+    case 'observation':
+      currentIteration.result = ev.result;
+      addTimelineEntry(currentIteration);
+      currentIteration = {};
+      break;
+
+
+    case 'done':
+      setStatus('done', 'Resolved');
+      showDone(ev);
+      document.getElementById('done-banner').style.display = 'block';
+      document.getElementById('run-btn').disabled  = false;
+      document.getElementById('stop-btn').style.display = 'none';
+      running = false;
+      addTimelineEntry({ iter: ev.iteration, reason: ev.reason, tool: 'finish', params: {}, result: ev.summary || '' });
+      break;
+
+    case 'report':
+      addReportBlock(ev.text);
+      break;
+
+    case 'methodology':
+      addMethodologyBlock(ev.text);
+      break;
+
+    case 'error':
+      stopAgent();
+      setStatus('error', 'Error');
+      showError(ev.message);
+      break;
+
+    case 'stream_end':
+      stopAgent();
+      break;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  Decision panel
+// ──────────────────────────────────────────────────────────────────
+function showDecision(ev) {
+  const panel = document.getElementById('decision-panel');
+  const params = Object.entries(ev.params || {})
+    .map(([k, v]) => `${k}: ${v}`).join('\n');
+
+  panel.innerHTML = `
+    <div class="decision-box">
+      <div class="label">Iteration</div>
+      <div class="value" style="color:var(--purple)">#${ev.iteration}</div>
+    </div>
+    <div class="decision-box">
+      <div class="label">Reasoning</div>
+      <div class="value">${escHtml(ev.reason || '(thinking…)')}</div>
+    </div>
+    <div class="decision-box">
+      <div class="label">Tool Selected</div>
+      <div class="value"><span class="tool-chip">${escHtml(ev.tool)}</span></div>
+    </div>
+    ${params ? `<div class="decision-box">
+      <div class="label">Parameters</div>
+      <div class="param-list">${escHtml(params)}</div>
+    </div>` : ''}
+    <div style="text-align:center;padding:8px;color:var(--text-muted);font-size:12px">
+      <span class="spinner pulse"></span>Executing…
+    </div>
+  `;
+}
+
+function showDone(ev) {
+  const panel = document.getElementById('decision-panel');
+  panel.innerHTML = `
+    <div class="decision-box" style="border-color:var(--green)">
+      <div class="label" style="color:var(--green)">Resolved</div>
+      <div class="value">${escHtml(ev.reason || 'Issue resolved.')}</div>
+    </div>
+    ${ev.summary ? `<div class="decision-box">
+      <div class="label">Summary</div>
+      <div class="value" style="color:var(--text-muted)">${escHtml(ev.summary)}</div>
+    </div>` : ''}
+  `;
+}
+
+function showError(msg) {
+  document.getElementById('decision-panel').innerHTML = `
+    <div class="decision-box" style="border-color:var(--red)">
+      <div class="label" style="color:var(--red)">Error</div>
+      <div class="value">${escHtml(msg)}</div>
+    </div>`;
+}
+
+function clearDecisionPanel() {
+  document.getElementById('decision-panel').innerHTML = `
+    <div class="decision-box">
+      <div class="label">Status</div>
+      <div class="value" style="color:var(--text-muted)">Ready to start</div>
+    </div>`;
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  Timeline
+// ──────────────────────────────────────────────────────────────────
+let tlReady = false;
+
+function syntaxJson(str) {
+  // Escape HTML first, then apply span coloring on the escaped string
+  const escaped = str
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped.replace(
+    /("(?:\\.|[^"\\])*")\s*:|("(?:\\.|[^"\\])*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?(?=\s*[,\]\}]))|(\btrue\b|\bfalse\b|\bnull\b)/g,
+    (m, key, str_, num, bool) => {
+      if (key)  return `<span class="jk">${key}</span>:`;
+      if (str_) return `<span class="js">${str_}</span>`;
+      if (num)  return `<span class="jn">${num}</span>`;
+      if (bool) return `<span class="jb">${bool}</span>`;
+      return m;
+    }
+  );
+}
+
+function buildLlmRows(rawContent, reason) {
+  const blocks = rawContent || [];
+  const json = JSON.stringify(blocks, null, 2);
+  return `
+    <div class="llm-line">
+      <span class="llm-key">content</span>
+      <pre class="llm-content-block">${syntaxJson(json)}</pre>
+    </div>`;
+}
+
+function addTimelineEntry({ iter, reason, tool, params, result, rawContent }) {
+  if (!tlReady) {
+    document.getElementById('timeline').innerHTML = '';
+    tlReady = true;
+  }
+  const tl = document.getElementById('timeline');
+
+  const isPass = result && /REACHABLE|OPERATIONAL|SUCCESS|UP|resolved|permitted/i.test(result);
+  const isFail = result && /UNREACHABLE|FAIL|down|Timeout|packet loss/i.test(result);
+  const paramStr = Object.entries(params || {}).map(([k,v]) => `${k}=${v}`).join(', ');
+  const toolStr  = paramStr ? `${tool}(${paramStr})` : `${tool}()`;
+
+  const card = document.createElement('div');
+  card.className = 'tl-card';
+  const osiShort = OSI_LAYER[tool] || '';
+  const osiSuffix = osiShort ? ` <span class="tl-card-osi-inline">(${escHtml(osiShort)})</span>` : '';
+  card.innerHTML = `
+    <div class="tl-card-header">
+      <span class="iter-num">Iteration ${iter}</span>
+      <span class="iter-model">${escHtml(agentModel)}</span>
+    </div>
+    <div class="tl-card-row">
+      <span class="tl-card-label">LLM</span>
+      <span class="tl-card-llm">${buildLlmRows(rawContent, reason)}</span>
+    </div>
+    <div class="tl-card-row">
+      <span class="tl-card-label">Tool</span>
+      <span class="tl-card-tool">${escHtml(toolStr)}${osiSuffix}</span>
+    </div>
+    <div class="tl-card-row">
+      <span class="tl-card-label">Result</span>
+      <span class="tl-card-result ${isPass?'pass':isFail?'fail':''}">${escHtml(result || '—')}</span>
+    </div>
+  `;
+  tl.appendChild(card);
+  tl.scrollTop = tl.scrollHeight;
+}
+
+function clearTimeline() {
+  tlReady = false;
+  document.getElementById('timeline').innerHTML = `
+    <div style="padding:8px 0;color:var(--text-muted);font-size:12px;text-align:center">
+      Agent timeline will appear here once started
+    </div>`;
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  Topology SVG
+// ──────────────────────────────────────────────────────────────────
+const NODE_DEFS = {
+  firewall:    { x: 155, y: 8,   label: 'Firewall',    icon: '🛡' },
+  router1:     { x: 155, y: 78,  label: 'Router1',     icon: '⬡' },
+  mgmt_server: { x: 310, y: 78,  label: 'MGMT-SRV',   icon: '⚙', mgmt: true },
+  switch1:     { x: 35,  y: 155, label: 'Switch1',     icon: '◫' },
+  switch2:     { x: 275, y: 155, label: 'Switch2',     icon: '◫' },
+  pc1:         { x: 12,  y: 228, label: 'PC1',         icon: '💻', w: 56 },
+  dns_server:  { x: 88,  y: 228, label: 'DNS Server',  icon: '⑆' },
+  server1:     { x: 275, y: 228, label: 'Server1',     icon: '🖥' },
+};
+const LINK_DEFS = [
+  { from: 'firewall',    to: 'router1'     },
+  { from: 'router1',     to: 'switch1'     },
+  { from: 'router1',     to: 'switch2'     },
+  { from: 'switch1',     to: 'pc1'         },
+  { from: 'switch1',     to: 'dns_server'  },
+  { from: 'switch2',     to: 'server1'     },
+  { from: 'router1',     to: 'mgmt_server', outOfBand: true },
+];
+const W = 100, H = 40;
+
+function colorFor(status) {
+  if (status === 'fault')        return { fill: '#2f1a1a', stroke: '#f85149' };
+  if (status === 'investigating') return { fill: '#2a2310', stroke: '#d29922' };
+  return { fill: '#1a2f1a', stroke: '#3fb950' };
+}
+function linkColorFor(status) {
+  return status === 'fault' ? '#f85149' : '#3fb950';
+}
+
+let nodeStatus = {};
+let linkStatus = {};
+
+function defaultTopology() {
+  const devices = {};
+  Object.keys(NODE_DEFS).forEach(k => { devices[k] = { status: 'healthy' }; });
+  const links = LINK_DEFS.map(l => ({ ...l, status: 'healthy' }));
+  // mgmt_server is always shown as healthy — it's the management plane, never a fault target
+  devices['mgmt_server'] = { status: 'healthy' };
+  return { devices, links };
+}
+
+function drawTopology(state) {
+  nodeStatus = {};
+  linkStatus = {};
+  (state.links || []).forEach(l => { linkStatus[`${l.from}-${l.to}`] = l.status; });
+  Object.entries(state.devices || {}).forEach(([k, v]) => { nodeStatus[k] = v.status; });
+
+  const svg = document.getElementById('topology-svg');
+  svg.innerHTML = '';
+
+  // Links
+  LINK_DEFS.forEach(l => {
+    const a = NODE_DEFS[l.from], b = NODE_DEFS[l.to];
+    if (!a || !b) return;
+    const aw = a.w || W, bw = b.w || W;
+    const key = `${l.from}-${l.to}`;
+    const status = linkStatus[key] || linkStatus[`${l.to}-${l.from}`] || 'healthy';
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', a.x + aw/2); line.setAttribute('y1', a.y + H/2);
+    line.setAttribute('x2', b.x + bw/2); line.setAttribute('y2', b.y + H/2);
+    if (l.outOfBand) {
+      line.setAttribute('stroke', '#58a6ff');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-dasharray', '5,3');
+      line.setAttribute('opacity', '0.6');
+    } else {
+      line.setAttribute('stroke', linkColorFor(status));
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-dasharray', status === 'fault' ? '6,4' : '');
+    }
+    line.setAttribute('class', 'link');
+    svg.appendChild(line);
+  });
+
+  // Nodes
+  Object.entries(NODE_DEFS).forEach(([id, def]) => {
+    const status = nodeStatus[id] || 'healthy';
+    const { fill, stroke } = def.mgmt
+      ? { fill: '#0d1a2f', stroke: '#58a6ff' }
+      : colorFor(status);
+    const nw = def.w || W;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'node');
+    g.setAttribute('transform', `translate(${def.x}, ${def.y})`);
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('width', nw); rect.setAttribute('height', H);
+    rect.setAttribute('rx', 8); rect.setAttribute('ry', 8);
+    rect.setAttribute('fill', fill); rect.setAttribute('stroke', stroke);
+    rect.setAttribute('stroke-width', 2);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', nw/2); label.setAttribute('y', H/2 + 4);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('fill', '#e6edf3');
+    label.setAttribute('font-size', '11');
+    label.setAttribute('font-family', 'monospace');
+    label.setAttribute('font-weight', '600');
+    label.textContent = def.label;
+
+    g.appendChild(rect);
+    g.appendChild(label);
+    svg.appendChild(g);
+  });
+}
+
+function updateTopology(state) {
+  drawTopology(state);
+}
+
+// ──────────────────────────────────────────────────────────────────
+//  Helpers
+// ──────────────────────────────────────────────────────────────────
+function setStatus(type, text) {
+  const badge = document.getElementById('status-badge');
+  badge.className = `status-badge ${type}`;
+  badge.textContent = type === 'running' ? '' : '';
+  if (type === 'running') {
+    badge.innerHTML = `<span class="spinner"></span>${text}`;
+  } else {
+    badge.textContent = text;
+  }
+}
+
+function addReportBlock(data) {
+  const tl = document.getElementById('timeline');
+  const block = document.createElement('div');
+  block.className = 'tl-report';
+  block.innerHTML = `
+    <div class="tl-report-header">Resolution Report</div>
+    <div class="tl-report-row">
+      <span class="tl-report-rlabel">Root Cause</span>
+      <span class="rf-root-val">${escHtml(data.root_cause || '?')}</span>
+    </div>
+    <div class="tl-report-row">
+      <span class="tl-report-rlabel">Fix Applied</span>
+      <span class="rf-fix-val">${escHtml(data.fix || '?')}</span>
+    </div>
+    <div class="tl-report-row">
+      <span class="tl-report-rlabel">Iterations</span>
+      <span class="rf-total-val">${data.total || '?'} total</span>
+    </div>
+  `;
+  tl.appendChild(block);
+  tl.scrollTop = tl.scrollHeight;
+}
+
+function addMethodologyBlock(text) {
+  const tl = document.getElementById('timeline');
+  const block = document.createElement('div');
+  block.className = 'tl-methodology';
+  block.innerHTML = `
+    <div class="tl-methodology-header">Diagnostic Methodology</div>
+    <div class="tl-methodology-body">${escHtml(text)}</div>
+  `;
+  tl.appendChild(block);
+  tl.scrollTop = tl.scrollHeight;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+function truncate(str, n) {
+  return str.length > n ? str.slice(0, n) + '…' : str;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "problem": "All hostnames are failing to resolve. Services relying on DNS are down.",
+  "source": "pc1",
+  "destination": "dns_server",
+  "reported_by": "platform@corp.local",
+  "severity": "critical",
+  "affected_users": 500,
+  "notes": "DNS server IP is 10.0.1.53, connected to switch1 port Fa0/3. Physical connectivity to server is confirmed.",
+  "affected_device_ip": "10.0.1.53",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/3"
+}

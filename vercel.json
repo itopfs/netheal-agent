@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app.py": {
+      "maxDuration": 300
+    }
+  },
+  "excludeFiles": [
+    "{.venv,.git,__pycache__,.cursor}/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "Self-Healing-Network-Agent-Final-Plan.md",
+    "uv.lock"
+  ]
+}

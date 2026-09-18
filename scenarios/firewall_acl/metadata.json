@@ -1,0 +1,5 @@
+{
+  "name": "Firewall ACL Block",
+  "description": "A misconfigured firewall rule is blocking all traffic from the office subnet to the server.",
+  "difficulty": "Medium"
+}

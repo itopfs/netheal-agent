@@ -1,0 +1,12 @@
+{
+  "problem": "Network is completely unresponsive. All connections timing out. NOC dashboard shows router CPU at 98%.",
+  "source": "pc1",
+  "destination": "server1",
+  "reported_by": "noc@corp.local",
+  "severity": "critical",
+  "affected_users": 500,
+  "notes": "BGP was re-enabled on router1 after 6 months disabled. Default route may be conflicting.",
+  "affected_device_ip": "10.0.1.100",
+  "connected_to": "switch1",
+  "connected_port": "Fa0/1"
+}

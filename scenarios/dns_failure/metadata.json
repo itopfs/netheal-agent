@@ -1,0 +1,5 @@
+{
+  "name": "DNS Failure",
+  "description": "The internal DNS server is unreachable \u2014 its upstream switch port went error-disabled.",
+  "difficulty": "Hard"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Missing Route",
+  "description": "A static route was accidentally removed from the router, making a subnet unreachable.",
+  "difficulty": "Medium"
+}
